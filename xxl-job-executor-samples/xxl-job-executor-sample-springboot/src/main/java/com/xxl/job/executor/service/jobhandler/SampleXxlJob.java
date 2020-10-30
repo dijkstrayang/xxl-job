@@ -1,10 +1,10 @@
 package com.xxl.job.executor.service.jobhandler;
 
 import com.xxl.job.core.biz.model.ReturnT;
+import com.xxl.job.core.context.XxlJobContext;
 import com.xxl.job.core.handler.IJobHandler;
 import com.xxl.job.core.handler.annotation.XxlJob;
 import com.xxl.job.core.log.XxlJobLogger;
-import com.xxl.job.core.util.ShardingUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -55,12 +55,14 @@ public class SampleXxlJob {
     public ReturnT<String> shardingJobHandler(String param) throws Exception {
 
         // 分片参数
-        ShardingUtil.ShardingVO shardingVO = ShardingUtil.getShardingVo();
-        XxlJobLogger.log("分片参数：当前分片序号 = {}, 总分片数 = {}", shardingVO.getIndex(), shardingVO.getTotal());
+        int shardIndex = XxlJobContext.getXxlJobContext().getShardIndex();
+        int shardTotal = XxlJobContext.getXxlJobContext().getShardTotal();
+
+        XxlJobLogger.log("分片参数：当前分片序号 = {}, 总分片数 = {}", shardIndex, shardTotal);
 
         // 业务逻辑
-        for (int i = 0; i < shardingVO.getTotal(); i++) {
-            if (i == shardingVO.getIndex()) {
+        for (int i = 0; i < shardTotal; i++) {
+            if (i == shardIndex) {
                 XxlJobLogger.log("第 {} 片, 命中分片开始处理", i);
             } else {
                 XxlJobLogger.log("第 {} 片, 忽略", i);
@@ -82,7 +84,13 @@ public class SampleXxlJob {
         BufferedReader bufferedReader = null;
         try {
             // command process
-            Process process = Runtime.getRuntime().exec(command);
+            ProcessBuilder processBuilder = new ProcessBuilder();
+            processBuilder.command(command);
+            processBuilder.redirectErrorStream(true);
+
+            Process process = processBuilder.start();
+            //Process process = Runtime.getRuntime().exec(command);
+
             BufferedInputStream bufferedInputStream = new BufferedInputStream(process.getInputStream());
             bufferedReader = new BufferedReader(new InputStreamReader(bufferedInputStream));
 
@@ -151,6 +159,7 @@ public class SampleXxlJob {
             XxlJobLogger.log("method["+ method +"] invalid.");
             return ReturnT.FAIL;
         }
+        boolean isPostMethod = method.equals("POST");
 
         // request
         HttpURLConnection connection = null;
@@ -162,7 +171,7 @@ public class SampleXxlJob {
 
             // connection setting
             connection.setRequestMethod(method);
-            connection.setDoOutput(true);
+            connection.setDoOutput(isPostMethod);
             connection.setDoInput(true);
             connection.setUseCaches(false);
             connection.setReadTimeout(5 * 1000);
@@ -175,7 +184,7 @@ public class SampleXxlJob {
             connection.connect();
 
             // data
-            if (data!=null && data.trim().length()>0) {
+            if (isPostMethod && data!=null && data.trim().length()>0) {
                 DataOutputStream dataOutputStream = new DataOutputStream(connection.getOutputStream());
                 dataOutputStream.write(data.getBytes("UTF-8"));
                 dataOutputStream.flush();
