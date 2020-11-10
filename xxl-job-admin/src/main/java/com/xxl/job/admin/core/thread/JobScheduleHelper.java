@@ -34,6 +34,8 @@ public class JobScheduleHelper {
     private Thread ringThread;
     private volatile boolean scheduleThreadToStop = false;
     private volatile boolean ringThreadToStop = false;
+
+    // 时间轮
     private volatile static Map<Integer, List<Integer>> ringData = new ConcurrentHashMap<>();
 
     public void start(){
@@ -53,6 +55,7 @@ public class JobScheduleHelper {
                 logger.info(">>>>>>>>> init xxl-job admin scheduler success.");
 
                 // pre-read count: treadpool-size * trigger-qps (each trigger cost 50ms, qps = 1000/50 = 20)
+                // 调度中心任务平均分配，触发组件每次获取与线程池数量相关数量的任务，避免大量任务集中在单个调度中心集群节点；
                 int preReadCount = (XxlJobAdminConfig.getAdminConfig().getTriggerPoolFastMax() + XxlJobAdminConfig.getAdminConfig().getTriggerPoolSlowMax()) * 20;
 
                 while (!scheduleThreadToStop) {
@@ -71,26 +74,35 @@ public class JobScheduleHelper {
                         connAutoCommit = conn.getAutoCommit();
                         conn.setAutoCommit(false);
 
+                        // 首先利用for update语句进行获取任务的资格锁定，再去获取未来5秒内即将要执行的任务。
                         preparedStatement = conn.prepareStatement(  "select * from xxl_job_lock where lock_name = 'schedule_lock' for update" );
                         preparedStatement.execute();
 
                         // tx start
-
                         // 1、pre read
                         long nowTime = System.currentTimeMillis();
+                        // 获取未来5秒内即将要执行的任务,注意数量控制
                         List<XxlJobInfo> scheduleList = XxlJobAdminConfig.getAdminConfig().getXxlJobInfoDao().scheduleJobQuery(nowTime + PRE_READ_MS, preReadCount);
                         if (scheduleList!=null && scheduleList.size()>0) {
                             // 2、push time-ring
+
+                            /**
+                             * 预读取调度策略
+                             * 2.1 执行时间，超时5s以上,根据调度过期策略选择是否进行立即补偿触发执行，并计算下次执行时间
+                             * 2.2 执行时间，已到，超时少于等于5s，立即执行，并计算下次执行时间，如果下次执行时间在5s内，则直接添加到时间轮中重新计算下次执行时间
+                             * 2.3 执行时间，未到，添加到时间轮，并计算下次执行时间
+                             */
                             for (XxlJobInfo jobInfo: scheduleList) {
 
                                 // time-ring jump
                                 if (nowTime > jobInfo.getTriggerNextTime() + PRE_READ_MS) {
                                     // 2.1、trigger-expire > 5s：pass && make next-trigger-time
+                                    // 任务调度错过触发时间时的处理策略： - 可能原因：服务重启；调度线程被阻塞，线程被耗尽；上次调度持续阻塞，下次调度被错过
                                     logger.warn(">>>>>>>>>>> xxl-job, schedule misfire, jobId = " + jobInfo.getId());
 
                                     // 1、misfire match
                                     MisfireStrategyEnum misfireStrategyEnum = MisfireStrategyEnum.match(jobInfo.getMisfireStrategy(), MisfireStrategyEnum.DO_NOTHING);
-                                    if (MisfireStrategyEnum.FIRE_ONCE_NOW == misfireStrategyEnum) {
+                                    if (MisfireStrategyEnum.FIRE_ONCE_NOW == misfireStrategyEnum) {// 立即执行
                                         // FIRE_ONCE_NOW 》 trigger
                                         JobTriggerPoolHelper.trigger(jobInfo.getId(), TriggerTypeEnum.MISFIRE, -1, null, null, null);
                                         logger.debug(">>>>>>>>>>> xxl-job, schedule push trigger : jobId = " + jobInfo.getId() );
@@ -145,6 +157,7 @@ public class JobScheduleHelper {
                             }
 
                         } else {
+                            // 任务触发组件优化，常规1s预加载一次，预加载轮空时主动休眠1s，降低加载频率以及对DB压力；
                             preReadSuc = false;
                         }
 
@@ -157,7 +170,7 @@ public class JobScheduleHelper {
                         }
                     } finally {
 
-                        // commit
+                        // commit 避免异常无法commit导致锁表；
                         if (conn != null) {
                             try {
                                 conn.commit();
@@ -166,6 +179,7 @@ public class JobScheduleHelper {
                                     logger.error(e.getMessage(), e);
                                 }
                             }
+                            //DB重连优化，修复DB宕机重连后任务调度停止的问题，重连后自动加入调度集群触发任务调度；??
                             try {
                                 conn.setAutoCommit(connAutoCommit);
                             } catch (SQLException e) {
@@ -200,6 +214,7 @@ public class JobScheduleHelper {
                     if (cost < 1000) {  // scan-overtime, not wait
                         try {
                             // pre-read period: success > scan each second; fail > skip this period;
+                            // 任务触发组件优化，预加载频率正常1s一次，当预加载轮空时主动休眠一个加载周期，动态降低加载频率从而降低DB压力；
                             TimeUnit.MILLISECONDS.sleep((preReadSuc?1000:PRE_READ_MS) - System.currentTimeMillis()%1000);
                         } catch (InterruptedException e) {
                             if (!scheduleThreadToStop) {
@@ -219,6 +234,9 @@ public class JobScheduleHelper {
 
 
         // ring thread
+        /**
+         * 根据当前秒数刻度和前一个刻度进行时间轮的任务获取，之后和上文一样，利用JobTriggerPoolHelper进行任务调度
+         */
         ringThread = new Thread(new Runnable() {
             @Override
             public void run() {
@@ -305,6 +323,7 @@ public class JobScheduleHelper {
         logger.debug(">>>>>>>>>>> xxl-job, schedule push time-ring : " + ringSecond + " = " + Arrays.asList(ringItemData) );
     }
 
+    //调度组件销毁流程优化，先停止调度线程，然后等待时间轮内存量任务处理完成，最终销毁时间轮线程；
     public void toStop(){
 
         // 1、stop schedule

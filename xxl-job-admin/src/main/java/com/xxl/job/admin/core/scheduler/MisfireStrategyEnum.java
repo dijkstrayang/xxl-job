@@ -4,6 +4,7 @@ import com.xxl.job.admin.core.util.I18nUtil;
 
 /**
  * @author xuxueli 2020-10-29 21:11:23
+ * 调度过期策略：调度中心错过调度时间的补偿处理策略，包括：忽略、立即补偿触发一次等
  */
 public enum MisfireStrategyEnum {
 
@@ -27,6 +28,7 @@ public enum MisfireStrategyEnum {
         return title;
     }
 
+    // 缺省策略 值得借鉴
     public static MisfireStrategyEnum match(String name, MisfireStrategyEnum defaultItem){
         for (MisfireStrategyEnum item: MisfireStrategyEnum.values()) {
             if (item.name().equals(name)) {

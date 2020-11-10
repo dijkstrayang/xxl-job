@@ -16,7 +16,14 @@ import java.util.concurrent.ConcurrentMap;
  * Created by xuxueli on 17/3/10.
  */
 public class ExecutorRouteLFU extends ExecutorRouter {
-
+    /**
+     * key:jobId
+     * value: {
+     *     key:address
+     *     value:count
+     * }
+     *
+     */
     private static ConcurrentMap<Integer, HashMap<String, Integer>> jobLfuMap = new ConcurrentHashMap<Integer, HashMap<String, Integer>>();
     private static long CACHE_VALID_TIME = 0;
 
@@ -37,8 +44,8 @@ public class ExecutorRouteLFU extends ExecutorRouter {
 
         // put new
         for (String address: addressList) {
-            if (!lfuItemMap.containsKey(address) || lfuItemMap.get(address) >1000000 ) {
-                lfuItemMap.put(address, new Random().nextInt(addressList.size()));  // 初始化时主动Random一次，缓解首次压力
+            if (!lfuItemMap.containsKey(address) || lfuItemMap.get(address) >1000000 ) {// 避免自增无上限
+                lfuItemMap.put(address, new Random().nextInt(addressList.size()));  // 初始化时主动Random一次，缓解首次路由压力集中在首台机器的问题修复
             }
         }
         // remove old
