@@ -12,6 +12,7 @@ import java.util.List;
 
 /**
  * Created by xuxueli on 17/3/10.
+ *路由策略新增 "忙碌转移" 模式：按照顺序依次进行空闲检测，第一个空闲检测成功的机器选定为目标执行器并发起调度；
  */
 public class ExecutorRouteBusyover extends ExecutorRouter {
 

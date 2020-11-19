@@ -4,6 +4,7 @@ import com.xxl.job.admin.core.util.I18nUtil;
 
 /**
  * @author xuxueli 2020-10-29 21:11:23
+ * 支持选择 "Cron触发"、"固定间隔时间触发"、"指定时间点触发"、"不选择" 等；
  */
 public enum ScheduleTypeEnum {
 

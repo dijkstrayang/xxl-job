@@ -88,7 +88,7 @@ public class JobScheduleHelper {
 
                             /**
                              * 预读取调度策略
-                             * 2.1 执行时间，超时5s以上,根据调度过期策略选择是否进行立即补偿触发执行，并计算下次执行时间
+                             * 2.1 执行时间，过期5s以上,根据调度过期策略选择是否进行立即补偿触发执行，并计算下次执行时间
                              * 2.2 执行时间，已到，超时少于等于5s，立即执行，并计算下次执行时间，如果下次执行时间在5s内，则直接添加到时间轮中重新计算下次执行时间
                              * 2.3 执行时间，未到，添加到时间轮，并计算下次执行时间
                              */
@@ -323,7 +323,7 @@ public class JobScheduleHelper {
         logger.debug(">>>>>>>>>>> xxl-job, schedule push time-ring : " + ringSecond + " = " + Arrays.asList(ringItemData) );
     }
 
-    //调度组件销毁流程优化，先停止调度线程，然后等待时间轮内存量任务处理完成，最终销毁时间轮线程；
+    //调度组件销毁流程优化，先停止调度线程，然后等待时间轮内存量任务处理完成-休眠8s，最终销毁时间轮线程；
     public void toStop(){
 
         // 1、stop schedule
@@ -384,12 +384,16 @@ public class JobScheduleHelper {
 
 
     // ---------------------- tools ----------------------
+    // 计算下次执行时间
     public static Date generateNextValidTime(XxlJobInfo jobInfo, Date fromTime) throws ParseException {
         ScheduleTypeEnum scheduleTypeEnum = ScheduleTypeEnum.match(jobInfo.getScheduleType(), null);
+        // cron 触发
         if (ScheduleTypeEnum.CRON == scheduleTypeEnum) {
             Date nextValidTime = new CronExpression(jobInfo.getScheduleConf()).getNextValidTimeAfter(fromTime);
             return nextValidTime;
-        } else if (ScheduleTypeEnum.FIX_RATE == scheduleTypeEnum || ScheduleTypeEnum.FIX_DELAY == scheduleTypeEnum) {
+        }
+        // 固定间隔时间触发、指定时间点
+        else if (ScheduleTypeEnum.FIX_RATE == scheduleTypeEnum || ScheduleTypeEnum.FIX_DELAY == scheduleTypeEnum) {
             return new Date(fromTime.getTime() + Integer.valueOf(jobInfo.getScheduleConf())*1000 );
         }
         return null;

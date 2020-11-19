@@ -8,21 +8,21 @@ import java.util.Date;
  */
 public class XxlJobLog {
 	
-	private long id;
+	private long id;// 日志ID
 	
 	// job info
-	private int jobGroup;
-	private int jobId;
+	private int jobGroup;// 执行器
+	private int jobId;// 任务ID
 
 	// execute info
-	private String executorAddress;
-	private String executorHandler;
-	private String executorParam;
-	private String executorShardingParam;
-	private int executorFailRetryCount;
+	private String executorAddress;// 执行器地址
+	private String executorHandler;// 执行器，任务Handler名称
+	private String executorParam;// 执行器，任务参数
+	private String executorShardingParam;//分片参数
+	private int executorFailRetryCount;//失败重试次数
 	
 	// trigger info
-	private Date triggerTime;
+	private Date triggerTime;// 触发时间
 	private int triggerCode;
 	private String triggerMsg;
 	

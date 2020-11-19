@@ -36,6 +36,7 @@ public class JobLosedMonitorHelper {
 			public void run() {
 
 				// wait for JobTriggerPoolHelper-init
+				//调度中心组件加载顺序优化，修复极端情况下调度组件初始慢导致的调度失败问题
 				try {
 					TimeUnit.MILLISECONDS.sleep(50);
 				} catch (InterruptedException e) {

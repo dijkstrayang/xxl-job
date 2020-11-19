@@ -103,7 +103,7 @@ public class JobThread extends Thread{
 		// execute
 		while(!toStop){
 			running = false;
-			idleTimes++;
+			idleTimes++;//任务线程轮空30次后自动销毁，降低低频任务的无效线程消耗。
 
             TriggerParam triggerParam = null;
             ReturnT<String> executeResult = null;
@@ -126,6 +126,7 @@ public class JobThread extends Thread{
 					// execute
 					XxlJobLogger.log("<br>----------- xxl-job job execute start -----------<br>----------- Param:" + triggerParam.getExecutorParams());
 
+					//任务超时控制：支持设置任务超时时间，任务运行超时的情况下，将会主动中断任务；
 					if (triggerParam.getExecutorTimeout() > 0) {
 						// limit timeout
 						Thread futureThread = null;
@@ -167,7 +168,9 @@ public class JobThread extends Thread{
 					XxlJobLogger.log("<br>----------- xxl-job job execute end(finish) -----------<br>----------- ReturnT:" + executeResult);
 
 				} else {
+					//任务线程轮空30次后自动销毁，降低低频任务的无效线程消耗。
 					if (idleTimes > 30) {
+						//JobThread自销毁优化，避免并发触发导致triggerQueue中任务丢失问题；
 						if(triggerQueue.size() == 0) {	// avoid concurrent trigger causes jobId-lost
 							XxlJobExecutor.removeJobThread(jobId, "excutor idel times over limit.");
 						}

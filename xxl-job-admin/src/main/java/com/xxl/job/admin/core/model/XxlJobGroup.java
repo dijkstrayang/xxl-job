@@ -7,6 +7,8 @@ import java.util.List;
 
 /**
  * Created by xuxueli on 16/9/30.
+ *
+ 执行器
  */
 public class XxlJobGroup {
 

@@ -13,7 +13,7 @@ public class TriggerParam implements Serializable{
     private String executorHandler;
     private String executorParams;
     private String executorBlockStrategy;
-    private int executorTimeout;
+    private int executorTimeout;//任务超时控制：支持设置任务超时时间，任务运行超时的情况下，将会主动中断任务；
 
     private long logId;
     private long logDateTime;

@@ -6,6 +6,8 @@ import com.xxl.job.admin.core.util.I18nUtil;
  * trigger type enum
  *
  * @author xuxueli 2018-09-16 04:56:41
+ *
+- 22、触发策略强化：除了常规Cron、API、父子任务触发方式外，新增提供 "固定间隔触发、固定延时触发" 两种新触发方式；
  */
 public enum TriggerTypeEnum {
 

@@ -21,6 +21,10 @@ public class JobTriggerPoolHelper {
     // ---------------------- trigger pool ----------------------
 
     // fast/slow thread pool
+    /**
+     *调度线程池隔离，拆分为"Fast"和"Slow"两个线程池.
+     * 1分钟窗口期内任务耗时达500ms超过10次，该窗口期内判定为慢任务，慢任务自动降级进入"Slow"线程池，避免耗尽调度线程，提高系统稳定性；
+     */
     private ThreadPoolExecutor fastTriggerPool = null;
     private ThreadPoolExecutor slowTriggerPool = null;
 
@@ -79,6 +83,7 @@ public class JobTriggerPoolHelper {
         // choose thread pool
         ThreadPoolExecutor triggerPool_ = fastTriggerPool;
         AtomicInteger jobTimeoutCount = jobTimeoutCountMap.get(jobId);
+        // 1分钟窗口期内任务耗时达500ms超过10次，该窗口期内判定为慢任务，慢任务自动降级进入"Slow"线程池，避免耗尽调度线程，提高系统稳定性
         if (jobTimeoutCount!=null && jobTimeoutCount.get() > 10) {      // job-timeout 10 times in 1 min
             triggerPool_ = slowTriggerPool;
         }
@@ -104,9 +109,9 @@ public class JobTriggerPoolHelper {
                         jobTimeoutCountMap.clear();
                     }
 
-                    // incr timeout-count-map
+                    // incr timeout-count-map 如果任务执行耗时超过阈值，累计超时次数
                     long cost = System.currentTimeMillis()-start;
-                    if (cost > 500) {       // ob-timeout threshold 500ms
+                    if (cost > 500) {       // ob-timeout threshold 500ms 任务执行超时的阈值
                         AtomicInteger timeoutCount = jobTimeoutCountMap.putIfAbsent(jobId, new AtomicInteger(1));
                         if (timeoutCount != null) {
                             timeoutCount.incrementAndGet();
@@ -142,6 +147,8 @@ public class JobTriggerPoolHelper {
      * @param executorParam
      *          null: use job param
      *          not null: cover job param
+     *
+     *  任务手动执行一次的时候，支持指定本次执行的机器地址，为空则从执行器获取
      */
     public static void trigger(int jobId, TriggerTypeEnum triggerType, int failRetryCount, String executorShardingParam, String executorParam, String addressList) {
         helper.addTrigger(jobId, triggerType, failRetryCount, executorShardingParam, executorParam, addressList);
